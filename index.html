@@ -209,7 +209,7 @@
     <div class="card">
       <h2>Reading Stand</h2>
       <div class="viewer-toolbar">
-        <label class="file-label" id="fileLabel">Open a PDF
+        <label class="file-label" id="fileLabel">Open / Switch PDF
           <input type="file" id="fileInput" accept="application/pdf">
         </label>
         <button class="secondary" id="prevBtn" disabled>&larr; Prev</button>
@@ -218,7 +218,7 @@
       </div>
       <div id="bookInfo"></div>
       <div class="pdf-stage" id="stage">
-        <div class="empty-state">No book open yet.<br>Choose a PDF from the shelf above to begin today's reading.</div>
+        <div class="empty-state">No book open yet.<br>Choose a PDF above &mdash; the app will remember it and your page automatically from now on.</div>
       </div>
     </div>
 
@@ -295,6 +295,42 @@ async function saveState(){
   try{
     localStorage.setItem('reader-ledger-state', JSON.stringify(state));
   }catch(e){ console.error('save failed', e); }
+}
+
+// --- IndexedDB: remembers the actual PDF file so we can auto-resume it ---
+function openBookDB(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open('readers-ledger-db', 1);
+    req.onupgradeneeded = () => {
+      req.result.createObjectStore('books', { keyPath: 'id' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function saveBookToDB(name, numPages, arrayBuffer){
+  try{
+    const db = await openBookDB();
+    await new Promise((resolve, reject)=>{
+      const tx = db.transaction('books','readwrite');
+      tx.objectStore('books').put({ id:'lastBook', name, numPages, buffer: arrayBuffer, savedAt: Date.now() });
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  }catch(e){ console.error('could not save book to device storage', e); }
+}
+
+async function getLastBookFromDB(){
+  try{
+    const db = await openBookDB();
+    return await new Promise((resolve, reject)=>{
+      const tx = db.transaction('books','readonly');
+      const req = tx.objectStore('books').get('lastBook');
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }catch(e){ return null; }
 }
 
 // If the user skipped one or more full days since their last completed day, break the streak.
@@ -401,15 +437,32 @@ document.getElementById('fileInput').addEventListener('change', async (e)=>{
   const file = e.target.files[0];
   if(!file) return;
   const arrayBuffer = await file.arrayBuffer();
+  await openBookWithBuffer(file.name, arrayBuffer);
+  saveBookToDB(file.name, numPages, arrayBuffer);
+});
+
+async function openBookWithBuffer(name, arrayBuffer){
   pdfDoc = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
   numPages = pdfDoc.numPages;
-  bookKey = file.name + '::' + numPages;
+  bookKey = name + '::' + numPages;
   document.getElementById('bookInfo').innerHTML =
-    `<div class="book-title">${file.name.replace(/\.pdf$/i,'')}</div>
+    `<div class="book-title">${name.replace(/\.pdf$/i,'')}</div>
      <div class="book-meta">${numPages} pages &middot; furthest reached: page ${state.bookProgress[bookKey]||0}</div>`;
   const startPage = Math.max(1, state.bookProgress[bookKey] || 1);
   await renderPage(startPage);
-});
+}
+
+async function tryAutoResume(){
+  const rec = await getLastBookFromDB();
+  if(rec && rec.buffer){
+    document.getElementById('stage').innerHTML = '<div class="empty-state">Resuming where you left off&hellip;</div>';
+    try{
+      await openBookWithBuffer(rec.name, rec.buffer);
+    }catch(e){
+      console.error('auto-resume failed', e);
+    }
+  }
+}
 
 document.getElementById('prevBtn').addEventListener('click', ()=>{
   if(currentPage>1) renderPage(currentPage-1);
@@ -427,6 +480,7 @@ document.getElementById('goalInput').addEventListener('change', (e)=>{
 });
 
 loadState();
+tryAutoResume();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
