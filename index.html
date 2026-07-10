@@ -421,13 +421,19 @@ async function renderPage(num){
   const targetWidth = Math.min(stage.clientWidth - 28, 700);
   const scale = targetWidth / viewportBase.width;
   const viewport = page.getViewport({scale});
+
+  const outputScale = window.devicePixelRatio || 1;
+
   stage.innerHTML = '';
   const canvas = document.createElement('canvas');
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
+  canvas.width = Math.floor(viewport.width * outputScale);
+  canvas.height = Math.floor(viewport.height * outputScale);
+  canvas.style.width = Math.floor(viewport.width) + 'px';
+  canvas.style.height = Math.floor(viewport.height) + 'px';
   stage.appendChild(canvas);
   const ctx = canvas.getContext('2d');
-  await page.render({canvasContext: ctx, viewport}).promise;
+  const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
+  await page.render({canvasContext: ctx, viewport, transform}).promise;
   currentPage = num;
   markPageReached(num);
   render();
