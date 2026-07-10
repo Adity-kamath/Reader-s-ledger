@@ -384,6 +384,19 @@ function render(){
   document.getElementById('prevBtn').disabled = !pdfDoc || currentPage<=1;
   document.getElementById('nextBtn').disabled = !pdfDoc || currentPage>=numPages;
   document.getElementById('pageIndicator').textContent = pdfDoc ? `Page ${currentPage} of ${numPages}` : '';
+
+  updateAppBadge();
+}
+
+function updateAppBadge(){
+  if(!('setAppBadge' in navigator)) return;
+  try{
+    if(state.currentStreak > 0){
+      navigator.setAppBadge(state.currentStreak).catch(()=>{});
+    } else {
+      navigator.clearAppBadge().catch(()=>{});
+    }
+  }catch(e){ /* badging not supported, ignore */ }
 }
 
 function markPageReached(page){
