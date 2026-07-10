@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Reader's Ledger</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1e2a24">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Space+Mono:wght@400;700&family=Source+Sans+3:wght@400;500;600&display=swap');
+
+  :root{
+    --ink: #1e2a24;
+    --paper: #f2ead9;
+    --paper-dim: #e8dfc9;
+    --brass: #a97c34;
+    --brass-deep: #7d5a20;
+    --stamp-red: #9c3d2e;
+    --line: #cfc3a3;
+    --card: #fbf6e9;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse at top left, rgba(169,124,52,0.08), transparent 55%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Source Sans 3', sans-serif;
+    min-height:100vh;
+    padding:28px 18px 60px;
+  }
+  .wrap{max-width:920px;margin:0 auto;}
+
+  /* header / ex-libris */
+  header{
+    text-align:center;
+    padding-bottom:18px;
+    margin-bottom:26px;
+    border-bottom:3px double var(--brass-deep);
+    position:relative;
+  }
+  header .eyebrow{
+    font-family:'Space Mono', monospace;
+    font-size:11px;
+    letter-spacing:.28em;
+    text-transform:uppercase;
+    color:var(--brass-deep);
+    margin-bottom:6px;
+  }
+  header h1{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size:clamp(30px,5vw,46px);
+    margin:0;
+    letter-spacing:.01em;
+  }
+  header .sub{
+    font-family:'Fraunces', serif;
+    font-style:italic;
+    font-size:14px;
+    color:#5b5344;
+    margin-top:4px;
+  }
+
+  .grid{display:grid;grid-template-columns:1.4fr 1fr;gap:22px;}
+  @media (max-width:760px){.grid{grid-template-columns:1fr;}}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:2px;
+    box-shadow:0 1px 0 var(--line), 0 8px 18px -12px rgba(30,20,10,.35);
+    padding:20px;
+    position:relative;
+  }
+  .card::before{
+    content:"";position:absolute;top:8px;left:8px;right:8px;bottom:8px;
+    border:1px solid var(--line);pointer-events:none;opacity:.5;
+  }
+  .card h2{
+    font-family:'Fraunces', serif;
+    font-size:13px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--brass-deep);
+    margin:0 0 14px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .card h2::after{content:"";flex:1;height:1px;background:var(--line);}
+
+  /* streak stamp card - signature element */
+  .streak-hero{text-align:center;padding:6px 0 10px;}
+  .streak-num{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size:72px;
+    line-height:1;
+    color:var(--stamp-red);
+    position:relative;
+    display:inline-block;
+  }
+  .streak-label{
+    font-family:'Space Mono', monospace;
+    font-size:12px;
+    letter-spacing:.2em;
+    text-transform:uppercase;
+    color:var(--ink);
+    margin-top:2px;
+  }
+  .streak-sub{font-size:12px;color:#6b6250;margin-top:10px;font-family:'Space Mono',monospace;}
+
+  .stamp-row{display:flex;justify-content:center;gap:8px;margin:18px 0 6px;flex-wrap:wrap;}
+  .stamp{
+    width:34px;height:34px;border-radius:50%;
+    border:2px solid var(--line);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Space Mono', monospace;
+    font-size:10px;color:#8a8065;
+    position:relative;
+    background:var(--paper);
+  }
+  .stamp.done{
+    border-color:var(--stamp-red);
+    color:var(--stamp-red);
+    transform:rotate(-8deg);
+    box-shadow:0 0 0 2px rgba(156,61,46,0.12);
+  }
+  .stamp.done::after{
+    content:"✓";
+    font-family:'Fraunces',serif; font-weight:700;
+    font-size:16px;
+  }
+  .stamp.today{outline:2px dashed var(--brass); outline-offset:2px;}
+
+  .goal-row{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:13px;}
+  .goal-row input[type=number]{
+    width:64px;padding:6px 8px;border:1px solid var(--line);
+    background:var(--paper);font-family:'Space Mono',monospace;font-size:13px;border-radius:2px;
+  }
+  .progress-outer{
+    height:10px;border:1px solid var(--brass-deep);border-radius:6px;overflow:hidden;
+    background:var(--paper-dim);margin-top:10px;
+  }
+  .progress-inner{height:100%;background:linear-gradient(90deg,var(--brass),var(--stamp-red));transition:width .35s ease;}
+  .progress-text{font-family:'Space Mono',monospace;font-size:11.5px;margin-top:6px;color:#6b6250;}
+
+  .stat-line{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px dashed var(--line);}
+  .stat-line:last-child{border-bottom:none;}
+  .stat-line b{font-family:'Space Mono',monospace;color:var(--brass-deep);}
+
+  /* pdf viewer */
+  .viewer-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  button{
+    font-family:'Space Mono',monospace;font-size:12px;letter-spacing:.05em;
+    background:var(--ink);color:var(--paper);border:none;padding:9px 14px;
+    border-radius:2px;cursor:pointer;text-transform:uppercase;
+  }
+  button.secondary{background:transparent;color:var(--brass-deep);border:1px solid var(--brass-deep);}
+  button:disabled{opacity:.35;cursor:not-allowed;}
+  button:hover:not(:disabled){opacity:.85;}
+  .file-label{
+    font-family:'Space Mono',monospace;font-size:12px;
+    border:1px dashed var(--brass-deep);padding:9px 14px;border-radius:2px;
+    color:var(--brass-deep);cursor:pointer;display:inline-block;
+  }
+  input[type=file]{display:none;}
+
+  .page-indicator{font-family:'Space Mono',monospace;font-size:12.5px;color:#5b5344;margin-left:auto;}
+
+  .pdf-stage{
+    background:#111a15;border:1px solid var(--line);border-radius:2px;
+    display:flex;justify-content:center;align-items:flex-start;
+    padding:14px;min-height:360px;overflow:auto;max-height:70vh;
+  }
+  .pdf-stage canvas{max-width:100%;box-shadow:0 6px 24px rgba(0,0,0,.5);}
+  .empty-state{
+    color:#c9c2a8;font-family:'Fraunces',serif;font-style:italic;
+    text-align:center;margin:auto;padding:40px 20px;font-size:15px;line-height:1.6;
+  }
+
+  .book-title{
+    font-family:'Fraunces',serif;font-size:15px;margin:0 0 4px;color:var(--ink);
+  }
+  .book-meta{font-family:'Space Mono',monospace;font-size:11px;color:#8a8065;margin-bottom:12px;}
+
+  footer{
+    text-align:center;margin-top:34px;font-family:'Space Mono',monospace;
+    font-size:11px;color:#8a8065;letter-spacing:.05em;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Est. Today &mdash; No. 001</div>
+    <h1>The Reader's Ledger</h1>
+    <div class="sub">a strict little system for a daily reading habit</div>
+  </header>
+
+  <div class="grid">
+
+    <!-- LEFT: PDF viewer -->
+    <div class="card">
+      <h2>Reading Stand</h2>
+      <div class="viewer-toolbar">
+        <label class="file-label" id="fileLabel">Open a PDF
+          <input type="file" id="fileInput" accept="application/pdf">
+        </label>
+        <button class="secondary" id="prevBtn" disabled>&larr; Prev</button>
+        <button class="secondary" id="nextBtn" disabled>Next &rarr;</button>
+        <span class="page-indicator" id="pageIndicator"></span>
+      </div>
+      <div id="bookInfo"></div>
+      <div class="pdf-stage" id="stage">
+        <div class="empty-state">No book open yet.<br>Choose a PDF from the shelf above to begin today's reading.</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: streak + stats -->
+    <div>
+      <div class="card">
+        <h2>Streak Stamp</h2>
+        <div class="streak-hero">
+          <div class="streak-num" id="streakNum">0</div>
+          <div class="streak-label">days running</div>
+        </div>
+        <div class="stamp-row" id="stampRow"></div>
+        <div class="streak-sub" id="streakSub">Read today's goal to stamp the ledger.</div>
+
+        <div class="goal-row">
+          <span>Daily goal:</span>
+          <input type="number" id="goalInput" min="1" value="10">
+          <span>pages</span>
+        </div>
+        <div class="progress-outer"><div class="progress-inner" id="progressBar" style="width:0%"></div></div>
+        <div class="progress-text" id="progressText">0 / 10 pages today</div>
+      </div>
+
+      <div class="card" style="margin-top:20px;">
+        <h2>Ledger Totals</h2>
+        <div class="stat-line"><span>Current streak</span><b id="statCurrent">0 days</b></div>
+        <div class="stat-line"><span>Longest streak</span><b id="statLongest">0 days</b></div>
+        <div class="stat-line"><span>Total pages read</span><b id="statTotalPages">0</b></div>
+        <div class="stat-line"><span>Days completed</span><b id="statDaysDone">0</b></div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>strict mode: a day only counts once you've hit the page goal &mdash; miss a day and the streak resets</footer>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const todayStr = () => new Date().toISOString().slice(0,10);
+const dayBefore = (dStr) => {
+  const d = new Date(dStr + 'T00:00:00');
+  d.setDate(d.getDate()-1);
+  return d.toISOString().slice(0,10);
+};
+
+let state = {
+  dailyGoal: 10,
+  currentStreak: 0,
+  longestStreak: 0,
+  lastCompletedDate: null,   // last date the goal was actually hit
+  dailyLog: {},              // { '2026-07-10': pagesReadThatDay }
+  totalPagesRead: 0,
+  bookProgress: {}           // { bookKey: furthestPage }
+};
+
+let pdfDoc = null, currentPage = 1, numPages = 0, bookKey = null;
+
+async function loadState(){
+  try{
+    const raw = localStorage.getItem('reader-ledger-state');
+    if(raw){
+      const saved = JSON.parse(raw);
+      state = Object.assign(state, saved);
+    }
+  }catch(e){ /* no saved state yet */ }
+  reconcileStreakOnLoad();
+  document.getElementById('goalInput').value = state.dailyGoal;
+  render();
+}
+
+async function saveState(){
+  try{
+    localStorage.setItem('reader-ledger-state', JSON.stringify(state));
+  }catch(e){ console.error('save failed', e); }
+}
+
+// If the user skipped one or more full days since their last completed day, break the streak.
+function reconcileStreakOnLoad(){
+  if(!state.lastCompletedDate){ return; }
+  const today = todayStr();
+  if(state.lastCompletedDate === today) return; // already completed today
+  const y = dayBefore(today);
+  if(state.lastCompletedDate !== y){
+    // gap of 2+ days since the last completed day -> streak broken
+    state.currentStreak = 0;
+  }
+}
+
+function pagesToday(){
+  return state.dailyLog[todayStr()] || 0;
+}
+
+function render(){
+  const today = todayStr();
+  const goal = state.dailyGoal;
+  const done = pagesToday();
+  const pct = Math.min(100, Math.round((done/goal)*100));
+
+  document.getElementById('streakNum').textContent = state.currentStreak;
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressText').textContent = `${done} / ${goal} pages today`;
+  document.getElementById('statCurrent').textContent = state.currentStreak + ' days';
+  document.getElementById('statLongest').textContent = state.longestStreak + ' days';
+  document.getElementById('statTotalPages').textContent = state.totalPagesRead;
+  document.getElementById('statDaysDone').textContent = Object.keys(state.dailyLog).filter(d => state.dailyLog[d] >= state.dailyGoal).length;
+
+  document.getElementById('streakSub').textContent = done >= goal
+    ? "Today's goal is met — the ledger is stamped."
+    : `${Math.max(0, goal-done)} pages left to stamp today.`;
+
+  // last 7 days stamp row (oldest to newest)
+  const row = document.getElementById('stampRow');
+  row.innerHTML = '';
+  for(let i=6;i>=0;i--){
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const dStr = d.toISOString().slice(0,10);
+    const label = d.toLocaleDateString(undefined,{weekday:'short'}).slice(0,2);
+    const complete = (state.dailyLog[dStr]||0) >= state.dailyGoal;
+    const div = document.createElement('div');
+    div.className = 'stamp' + (complete ? ' done' : '') + (dStr===today ? ' today' : '');
+    if(!complete) div.textContent = label;
+    row.appendChild(div);
+  }
+
+  document.getElementById('prevBtn').disabled = !pdfDoc || currentPage<=1;
+  document.getElementById('nextBtn').disabled = !pdfDoc || currentPage>=numPages;
+  document.getElementById('pageIndicator').textContent = pdfDoc ? `Page ${currentPage} of ${numPages}` : '';
+}
+
+function markPageReached(page){
+  if(!bookKey) return;
+  const furthest = state.bookProgress[bookKey] || 0;
+  if(page > furthest){
+    const newPagesCount = page - furthest;
+    state.bookProgress[bookKey] = page;
+    const today = todayStr();
+    state.dailyLog[today] = (state.dailyLog[today]||0) + newPagesCount;
+    state.totalPagesRead += newPagesCount;
+    checkGoalCompletion(today);
+    saveState();
+  }
+}
+
+function checkGoalCompletion(today){
+  if((state.dailyLog[today]||0) >= state.dailyGoal && state.lastCompletedDate !== today){
+    // Completing today for the first time
+    const y = dayBefore(today);
+    if(state.lastCompletedDate === y){
+      state.currentStreak += 1; // continued streak
+    } else {
+      state.currentStreak = 1; // fresh streak (missed day(s) before, or very first completion)
+    }
+    state.lastCompletedDate = today;
+    if(state.currentStreak > state.longestStreak) state.longestStreak = state.currentStreak;
+  }
+}
+
+async function renderPage(num){
+  const page = await pdfDoc.getPage(num);
+  const stage = document.getElementById('stage');
+  const viewportBase = page.getViewport({scale:1});
+  const targetWidth = Math.min(stage.clientWidth - 28, 700);
+  const scale = targetWidth / viewportBase.width;
+  const viewport = page.getViewport({scale});
+  stage.innerHTML = '';
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  stage.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  await page.render({canvasContext: ctx, viewport}).promise;
+  currentPage = num;
+  markPageReached(num);
+  render();
+}
+
+document.getElementById('fileInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const arrayBuffer = await file.arrayBuffer();
+  pdfDoc = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+  numPages = pdfDoc.numPages;
+  bookKey = file.name + '::' + numPages;
+  document.getElementById('bookInfo').innerHTML =
+    `<div class="book-title">${file.name.replace(/\.pdf$/i,'')}</div>
+     <div class="book-meta">${numPages} pages &middot; furthest reached: page ${state.bookProgress[bookKey]||0}</div>`;
+  const startPage = Math.max(1, state.bookProgress[bookKey] || 1);
+  await renderPage(startPage);
+});
+
+document.getElementById('prevBtn').addEventListener('click', ()=>{
+  if(currentPage>1) renderPage(currentPage-1);
+});
+document.getElementById('nextBtn').addEventListener('click', ()=>{
+  if(currentPage<numPages) renderPage(currentPage+1);
+});
+document.getElementById('goalInput').addEventListener('change', (e)=>{
+  let v = parseInt(e.target.value,10);
+  if(isNaN(v) || v<1) v = 1;
+  state.dailyGoal = v;
+  checkGoalCompletion(todayStr());
+  saveState();
+  render();
+});
+
+loadState();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
